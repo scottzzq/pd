@@ -64,7 +64,8 @@ type Server struct {
 	// for id allocator, we can use one allocator for
 	// store, region and peer, because we just need
 	// a unique ID.
-	idAlloc *idAllocator
+	idAlloc       *idAllocator
+	volumeIdAlloc *volumeIdAllocator
 	// for kv operation.
 	kv *kv
 	// for API operation.
@@ -182,6 +183,7 @@ func (s *Server) StartEtcd(apiHandler http.Handler) error {
 	log.Infof("init cluster id %v", s.clusterID)
 	s.rootPath = path.Join(pdRootPath, strconv.FormatUint(s.clusterID, 10))
 	s.idAlloc = &idAllocator{s: s}
+	s.volumeIdAlloc = &volumeIdAllocator{s: s}
 	s.kv = newKV(s)
 	s.cluster = newRaftCluster(s, s.clusterID)
 	// Server has started.

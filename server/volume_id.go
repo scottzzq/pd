@@ -9,23 +9,23 @@ import (
 	"github.com/ngaut/log"
 )
 
-const (
-	allocStep = uint64(1000)
-)
+// const (
+// 	allocStep = uint64(1000)
+// )
 
-// IDAllocator is the allocator to generate unique ID.
-type IDAllocator interface {
-	Alloc() (uint64, error)
-}
+// // IDAllocator is the allocator to generate unique ID.
+// type IDAllocator interface {
+// 	Alloc() (uint64, error)
+// }
 
-type idAllocator struct {
+type volumeIdAllocator struct {
 	mu   sync.Mutex
 	base uint64
 	end  uint64
 	s    *Server
 }
 
-func (alloc *idAllocator) Alloc() (uint64, error) {
+func (alloc *volumeIdAllocator) Alloc() (uint64, error) {
 	alloc.mu.Lock()
 	defer alloc.mu.Unlock()
 	if alloc.base == alloc.end {
@@ -41,8 +41,8 @@ func (alloc *idAllocator) Alloc() (uint64, error) {
 	return alloc.base, nil
 }
 
-func (alloc *idAllocator) generate() (uint64, error) {
-	key := alloc.s.getAllocIDPath()
+func (alloc *volumeIdAllocator) generate() (uint64, error) {
+	key := alloc.s.getVolumeAllocIDPath()
 	value, err := getValue(alloc.s.client, key)
 	log.Infof("Start Etcd Path:%s value:%s", key, value)
 	if err != nil {
@@ -76,6 +76,6 @@ func (alloc *idAllocator) generate() (uint64, error) {
 	return end, nil
 }
 
-func (s *Server) getAllocIDPath() string {
-	return path.Join(s.rootPath, "alloc_id")
+func (s *Server) getVolumeAllocIDPath() string {
+	return path.Join(s.rootPath, "alloc_volume_id")
 }

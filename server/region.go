@@ -103,3 +103,14 @@ func (r *regionInfo) GetStoreIds() map[uint64]struct{} {
 	}
 	return stores
 }
+
+func (r *regionInfo) GetFollowers() map[uint64]*metapb.Peer {
+	peers := r.GetPeers()
+	followers := make(map[uint64]*metapb.Peer, len(peers))
+	for _, peer := range peers {
+		if r.Leader == nil || r.Leader.GetId() != peer.GetId() {
+			followers[peer.GetStoreId()] = peer
+		}
+	}
+	return followers
+}

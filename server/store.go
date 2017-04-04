@@ -21,20 +21,20 @@ const (
 // TODO: Export this to API directly.
 type storeInfo struct {
 	*metapb.Store
-	stats *StoreStatus
+	status *StoreStatus
 }
 
 func newStoreInfo(store *metapb.Store) *storeInfo {
 	return &storeInfo{
-		Store: store,
-		stats: newStoreStatus(),
+		Store:  store,
+		status: newStoreStatus(),
 	}
 }
 
 func (s *storeInfo) clone() *storeInfo {
 	return &storeInfo{
-		Store: proto.Clone(s.Store).(*metapb.Store),
-		stats: s.stats.clone(),
+		Store:  proto.Clone(s.Store).(*metapb.Store),
+		status: s.status.clone(),
 	}
 }
 
@@ -60,7 +60,7 @@ func (s *storeInfo) getLabelValue(key string) string {
 }
 
 func (s *storeInfo) downTime() time.Duration {
-	return time.Since(s.stats.LastHeartbeatTS)
+	return time.Since(s.status.LastHeartbeatTS)
 }
 
 func (s *storeInfo) getLocationID(keys []string) string {
@@ -75,11 +75,45 @@ func (s *storeInfo) getLocationID(keys []string) string {
 	return id
 }
 
-func (s *storeInfo) regionScore() float64 {
-	if s.stats.GetCapacity() == 0 {
+func (s *storeInfo) resourceCount(kind ResourceKind) uint64 {
+	switch kind {
+	case leaderKind:
+		return s.leaderCount()
+	case regionKind:
+		return s.regionCount()
+	default:
 		return 0
 	}
-	return float64(s.stats.RegionCount) / float64(s.stats.GetCapacity())
+}
+
+func (s *storeInfo) resourceScore(kind ResourceKind) float64 {
+	switch kind {
+	case leaderKind:
+		return s.leaderScore()
+	case regionKind:
+		return s.regionScore()
+	default:
+		return 0
+	}
+}
+
+func (s *storeInfo) leaderCount() uint64 {
+	return uint64(s.status.LeaderCount)
+}
+
+func (s *storeInfo) leaderScore() float64 {
+	return float64(s.status.LeaderCount)
+}
+
+func (s *storeInfo) regionCount() uint64 {
+	return uint64(s.status.RegionCount)
+}
+
+func (s *storeInfo) regionScore() float64 {
+	if s.status.GetCapacity() == 0 {
+		return 0
+	}
+	return float64(s.status.RegionCount) / float64(s.status.GetCapacity())
 }
 
 // StoreStatus contains information about a store's status.

@@ -55,7 +55,7 @@ func (c *RaftCluster) start() error {
 		log.Warn("raft cluster has already been started")
 		return nil
 	}
-	cluster, err := loadClusterInfo(c.s.idAlloc, c.s.kv)
+	cluster, err := loadClusterInfo(c.s.idAlloc, c.s.volumeIdAlloc, c.s.kv)
 	if err != nil {
 		return errors.Trace(err)
 	}
@@ -111,7 +111,7 @@ func (c *RaftCluster) GetStore(storeID uint64) (*metapb.Store, *StoreStatus, err
 	if store == nil {
 		return nil, nil, errors.Errorf("invalid store ID %d, not found", storeID)
 	}
-	return store.Store, store.stats, nil
+	return store.Store, store.status, nil
 }
 
 func (s *Server) getClusterRootPath() string {

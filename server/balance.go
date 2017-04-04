@@ -1,8 +1,10 @@
 package server
 
 import (
+	"github.com/montanaflynn/stats"
 	"github.com/ngaut/log"
 	"github.com/pingcap/kvproto/pkg/metapb"
+	"math"
 	"time"
 )
 
@@ -46,10 +48,14 @@ func (r *replicaChecker) Check(region *regionInfo) Operator {
 		region, len(region.GetPeers()), r.rep.GetMaxReplicas())
 
 	if len(region.GetPeers()) < r.rep.GetMaxReplicas() {
+		log.Info("start selectBestPeer")
 		newPeer, _ := r.selectBestPeer(region)
 		if newPeer == nil {
+			log.Infof("replicaChecker Check, Region:[%v], peers_len:[%v], r.rep.GetMaxReplicas:[%v] Select Peer null",
+				region, len(region.GetPeers()), r.rep.GetMaxReplicas())
 			return nil
 		}
+		log.Infof("find BestPeer:%v", newPeer)
 		return newAddPeer(region, newPeer)
 	}
 	if len(region.GetPeers()) > r.rep.GetMaxReplicas() {
@@ -59,7 +65,8 @@ func (r *replicaChecker) Check(region *regionInfo) Operator {
 		}
 		return newRemovePeer(region, oldPeer)
 	}
-	return r.checkBestReplacement(region)
+	return nil
+	//return r.checkBestReplacement(region)
 }
 
 func (r *replicaChecker) checkDownPeer(region *regionInfo) Operator {
@@ -143,7 +150,6 @@ func (r *replicaChecker) selectBestPeer(region *regionInfo /*, filters ...Filter
 		return nil, 0
 	}
 	newPeer, err := r.cluster.allocPeer(bestStore.GetId())
-	newPeer.Id = 6
 	if err != nil {
 		log.Errorf("failed to allocate peer: %v", err)
 		return nil, 0
@@ -179,4 +185,89 @@ func (r *replicaChecker) selectBestReplacement(region *regionInfo, peer *metapb.
 	newRegion := region.clone()
 	newRegion.RemoveStorePeer(peer.GetStoreId())
 	return r.selectBestPeer(newRegion)
+}
+
+//对各个store上的leader数量做调度
+type balanceLeaderScheduler struct {
+	opt      *scheduleOption
+	limit    uint64
+	selector Selector
+}
+
+func newBalanceLeaderScheduler(opt *scheduleOption) *balanceLeaderScheduler {
+	var filters []Filter
+	// filters = append(filters, newBlockFilter())
+	// filters = append(filters, newStateFilter(opt))
+	// filters = append(filters, newHealthFilter(opt))
+	return &balanceLeaderScheduler{
+		opt:      opt,
+		limit:    1,
+		selector: newBalanceSelector(leaderKind, filters),
+	}
+}
+
+func (l *balanceLeaderScheduler) GetName() string {
+	return "balance-leader-scheduler"
+}
+
+func (l *balanceLeaderScheduler) GetResourceKind() ResourceKind {
+	return leaderKind
+}
+
+func (l *balanceLeaderScheduler) GetResourceLimit() uint64 {
+	return minUint64(l.limit, l.opt.GetLeaderScheduleLimit())
+}
+
+func (l *balanceLeaderScheduler) Prepare(cluster *clusterInfo) error { return nil }
+
+func (l *balanceLeaderScheduler) Cleanup(cluster *clusterInfo) {}
+
+func (l *balanceLeaderScheduler) Schedule(cluster *clusterInfo) Operator {
+	//选中Reion，以及新Leader
+	region, newLeader := scheduleTransferLeader(cluster, l.selector)
+	//log.Infof("balanceLeaderScheduler Schedule, region:[%v] newLeader:[%v]", region, newLeader)
+	if region == nil {
+		return nil
+	}
+	source := cluster.getStore(region.Leader.GetStoreId())
+	target := cluster.getStore(newLeader.GetStoreId())
+	if !shouldBalance(source, target, l.GetResourceKind()) {
+		return nil
+	}
+	l.limit = adjustBalanceLimit(cluster, l.GetResourceKind())
+	return newTransferLeader(region, newLeader)
+}
+
+// shouldBalance returns true if we should balance the source and target store.
+// The min balance diff provides a buffer to make the cluster stable, so that we
+// don't need to schedule very frequently.
+func shouldBalance(source, target *storeInfo, kind ResourceKind) bool {
+	sourceCount := source.resourceCount(kind)
+	sourceScore := source.resourceScore(kind)
+	targetScore := target.resourceScore(kind)
+	if targetScore >= sourceScore {
+		return false
+	}
+	diffRatio := 1 - targetScore/sourceScore
+	diffCount := diffRatio * float64(sourceCount)
+	return diffCount >= minBalanceDiff(sourceCount)
+}
+
+func adjustBalanceLimit(cluster *clusterInfo, kind ResourceKind) uint64 {
+	stores := cluster.getStores()
+	counts := make([]float64, 0, len(stores))
+	for _, s := range stores {
+		counts = append(counts, float64(s.resourceCount(kind)))
+	}
+	limit, _ := stats.StandardDeviation(stats.Float64Data(counts))
+	return maxUint64(1, uint64(limit))
+}
+
+// minBalanceDiff returns the minimal diff to do balance. The formula is based
+// on experience to let the diff increase alone with the count slowly.
+func minBalanceDiff(count uint64) float64 {
+	if count < bootstrapBalanceCount {
+		return bootstrapBalanceDiff
+	}
+	return math.Sqrt(float64(count))
 }

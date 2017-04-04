@@ -11,7 +11,7 @@ import (
 	"path"
 	"reflect"
 	"strings"
-	_ "time"
+	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/pkg/capnslog"
@@ -266,4 +266,25 @@ func diffRegionKeyInfo(origin *regionInfo, other *regionInfo) string {
 	}
 
 	return strings.Join(ret, ",")
+}
+
+func minUint64(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxUint64(a, b uint64) uint64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func minDuration(a, b time.Duration) time.Duration {
+	if a < b {
+		return a
+	}
+	return b
 }

@@ -267,6 +267,24 @@ func (c *conn) handleAllocID(req *pdpb.Request) (*pdpb.Response, error) {
 	}, nil
 }
 
+func (c *conn) handleAllocVoulumeID(req *pdpb.Request) (*pdpb.Response, error) {
+	request := req.GetAllocVolumeId()
+	if request == nil {
+		return nil, errors.Errorf("invalid alloc id command, but %v", req)
+	}
+	// We can use an allocator for all types ID allocation.
+	id, err := c.s.volumeIdAlloc.Alloc()
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	idResp := &pdpb.AllocVolumeIdResponse{
+		Id: id,
+	}
+	return &pdpb.Response{
+		AllocVolumeId: idResp,
+	}, nil
+}
+
 ////////////////////////////根据Region ID获取 Region
 func (c *conn) handleGetRegionByID(req *pdpb.Request) (*pdpb.Response, error) {
 	request := req.GetGetRegionById()

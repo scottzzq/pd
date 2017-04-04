@@ -220,7 +220,7 @@ func (c *conn) handleRequest(req *pdpb.Request) (*pdpb.Response, error) {
 	switch req.GetCmdType() {
 	//判断集群是否初始化
 	case pdpb.CommandType_IsBootstrapped:
-		log.Infof("Receive Cmd: IsBootstrapped: %v", req)
+		//log.Infof("Receive Cmd: IsBootstrapped: %v", req)
 		return c.handleIsBootstrapped(req)
 	// 初始化集群
 	case pdpb.CommandType_Bootstrap:
@@ -232,16 +232,20 @@ func (c *conn) handleRequest(req *pdpb.Request) (*pdpb.Response, error) {
 		return c.handlePutStore(req)
 	// store心跳
 	case pdpb.CommandType_StoreHeartbeat:
-		log.Infof("Receive Cmd: StoreHeartbeat: %v", req)
+		//log.Infof("Receive Cmd: StoreHeartbeat: %v", req)
 		return c.handleStoreHeartbeat(req)
 	//region心跳
 	case pdpb.CommandType_RegionHeartbeat:
-		log.Infof("Receive Cmd: RegionHeartbeat: %v", req)
+		//log.Infof("Receive Cmd: RegionHeartbeat: %v", req)
 		return c.handleRegionHeartbeat(req)
 	//分配id
 	case pdpb.CommandType_AllocId:
 		log.Infof("Receive Cmd: AllocId: %v", req)
 		return c.handleAllocID(req)
+	//分配id
+	case pdpb.CommandType_AllocVolumeId:
+		log.Infof("Receive Cmd: AllocVolumeId: %v", req)
+		return c.handleAllocVoulumeID(req)
 	//获取store，解析地址
 	case pdpb.CommandType_GetStore:
 		log.Infof("Receive Cmd: GetStore: %v", req)
