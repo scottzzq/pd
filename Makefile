@@ -18,4 +18,4 @@ client:
 
 clean:
 	rm -rf ./default.pd/
-	rm -rf log
+	rm -rf log/*

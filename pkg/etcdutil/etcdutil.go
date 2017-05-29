@@ -23,8 +23,8 @@ import (
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/juju/errors"
 	"github.com/ngaut/log"
-	"github.com/pingcap/pd/pkg/apiutil"
 	"golang.org/x/net/context"
+	"pd/pkg/apiutil"
 )
 
 const (

@@ -16,7 +16,7 @@ package server
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	//"io/ioutil"
 	"net/url"
 	"strings"
 	"sync/atomic"
@@ -25,9 +25,9 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/coreos/etcd/embed"
 	"github.com/juju/errors"
-	"github.com/pingcap/pd/pkg/metricutil"
-	"github.com/pingcap/pd/pkg/testutil"
-	"github.com/pingcap/pd/pkg/typeutil"
+	//"github.com/pingcap/pd/pkg/metricutil"
+	//"github.com/pingcap/pd/pkg/testutil"
+	"pd/pkg/typeutil"
 )
 
 // Config is the pd server configuration.
@@ -64,7 +64,7 @@ type Config struct {
 	// TsoSaveInterval is the interval to save timestamp.
 	TsoSaveInterval typeutil.Duration `toml:"tso-save-interval" json:"tso-save-interval"`
 
-	Metric metricutil.MetricConfig `toml:"metric" json:"metric"`
+	//Metric metricutil.MetricConfig `toml:"metric" json:"metric"`
 
 	Schedule ScheduleConfig `toml:"schedule" json:"schedule"`
 
@@ -237,7 +237,7 @@ func (c *Config) adjust() error {
 	}
 	adjustUint64(&c.tickMs, defaultTickMs)
 	adjustUint64(&c.electionMs, defaultElectionMs)
-	adjustString(&c.Metric.PushJob, c.Name)
+	//adjustString(&c.Metric.PushJob, c.Name)
 
 	c.Schedule.adjust()
 	c.Replication.adjust()
@@ -427,43 +427,43 @@ func (c *Config) genEmbedEtcdConfig() (*embed.Config, error) {
 
 // NewTestSingleConfig is only for test to create one pd.
 // Because pd-client also needs this, so export here.
-func NewTestSingleConfig() *Config {
-	cfg := &Config{
-		Name:                "pd",
-		ClientUrls:          testutil.UnixURL(),
-		PeerUrls:            testutil.UnixURL(),
-		InitialClusterState: embed.ClusterStateFlagNew,
-		LeaderLease:         1,
-		TsoSaveInterval:     typeutil.NewDuration(200 * time.Millisecond),
-	}
+// func NewTestSingleConfig() *Config {
+// 	cfg := &Config{
+// 		Name:                "pd",
+// 		ClientUrls:          testutil.UnixURL(),
+// 		PeerUrls:            testutil.UnixURL(),
+// 		InitialClusterState: embed.ClusterStateFlagNew,
+// 		LeaderLease:         1,
+// 		TsoSaveInterval:     typeutil.NewDuration(200 * time.Millisecond),
+// 	}
 
-	cfg.AdvertiseClientUrls = cfg.ClientUrls
-	cfg.AdvertisePeerUrls = cfg.PeerUrls
-	cfg.DataDir, _ = ioutil.TempDir("/tmp", "test_pd")
-	cfg.InitialCluster = fmt.Sprintf("pd=%s", cfg.PeerUrls)
-	cfg.disableStrictReconfigCheck = true
-	cfg.tickMs = 100
-	cfg.electionMs = 1000
-	cfg.adjust()
-	return cfg
-}
+// 	cfg.AdvertiseClientUrls = cfg.ClientUrls
+// 	cfg.AdvertisePeerUrls = cfg.PeerUrls
+// 	cfg.DataDir, _ = ioutil.TempDir("/tmp", "test_pd")
+// 	cfg.InitialCluster = fmt.Sprintf("pd=%s", cfg.PeerUrls)
+// 	cfg.disableStrictReconfigCheck = true
+// 	cfg.tickMs = 100
+// 	cfg.electionMs = 1000
+// 	cfg.adjust()
+// 	return cfg
+// }
 
 // NewTestMultiConfig is only for test to create multiple pd configurations.
 // Because pd-client also needs this, so export here.
-func NewTestMultiConfig(count int) []*Config {
-	cfgs := make([]*Config, count)
+// func NewTestMultiConfig(count int) []*Config {
+// 	cfgs := make([]*Config, count)
 
-	clusters := []string{}
-	for i := 1; i <= count; i++ {
-		cfg := NewTestSingleConfig()
-		cfg.Name = fmt.Sprintf("pd%d", i)
-		clusters = append(clusters, fmt.Sprintf("%s=%s", cfg.Name, cfg.PeerUrls))
-		cfgs[i-1] = cfg
-	}
+// 	clusters := []string{}
+// 	for i := 1; i <= count; i++ {
+// 		cfg := NewTestSingleConfig()
+// 		cfg.Name = fmt.Sprintf("pd%d", i)
+// 		clusters = append(clusters, fmt.Sprintf("%s=%s", cfg.Name, cfg.PeerUrls))
+// 		cfgs[i-1] = cfg
+// 	}
 
-	initialCluster := strings.Join(clusters, ",")
-	for _, cfg := range cfgs {
-		cfg.InitialCluster = initialCluster
-	}
-	return cfgs
-}
+// 	initialCluster := strings.Join(clusters, ",")
+// 	for _, cfg := range cfgs {
+// 		cfg.InitialCluster = initialCluster
+// 	}
+// 	return cfgs
+// }

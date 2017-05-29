@@ -187,7 +187,7 @@ func (r *replicaChecker) selectBestReplacement(region *regionInfo, peer *metapb.
 	return r.selectBestPeer(newRegion)
 }
 
-//对各个store上的leader数量做调度
+//////////////////////////////////对各个store上的leader数量做调度
 type balanceLeaderScheduler struct {
 	opt      *scheduleOption
 	limit    uint64
@@ -236,6 +236,92 @@ func (l *balanceLeaderScheduler) Schedule(cluster *clusterInfo) Operator {
 	}
 	l.limit = adjustBalanceLimit(cluster, l.GetResourceKind())
 	return newTransferLeader(region, newLeader)
+}
+
+/////////////////////////对各个store上的Region的数量做调度
+type balanceRegionScheduler struct {
+	opt      *scheduleOption
+	rep      *Replication
+	cache    *idCache
+	limit    uint64
+	selector Selector
+}
+
+func newBalanceRegionScheduler(opt *scheduleOption) *balanceRegionScheduler {
+	cache := newIDCache(storeCacheInterval, 4*storeCacheInterval)
+
+	var filters []Filter
+	// filters = append(filters, newCacheFilter(cache))
+	// filters = append(filters, newStateFilter(opt))
+	// filters = append(filters, newHealthFilter(opt))
+	// filters = append(filters, newSnapshotCountFilter(opt))
+
+	return &balanceRegionScheduler{
+		opt:      opt,
+		rep:      opt.GetReplication(),
+		cache:    cache,
+		limit:    1,
+		selector: newBalanceSelector(regionKind, filters),
+	}
+}
+
+func (s *balanceRegionScheduler) GetName() string {
+	return "balance-region-scheduler"
+}
+
+func (s *balanceRegionScheduler) GetResourceKind() ResourceKind {
+	return regionKind
+}
+
+func (s *balanceRegionScheduler) GetResourceLimit() uint64 {
+	return minUint64(s.limit, s.opt.GetRegionScheduleLimit())
+}
+
+func (s *balanceRegionScheduler) Prepare(cluster *clusterInfo) error { return nil }
+
+func (s *balanceRegionScheduler) Cleanup(cluster *clusterInfo) {}
+
+func (s *balanceRegionScheduler) Schedule(cluster *clusterInfo) Operator {
+	// Select a peer from the store with most regions.
+	region, oldPeer := scheduleRemovePeer(cluster, s.selector)
+	if region == nil {
+		return nil
+	}
+
+	// We don't schedule region with abnormal number of replicas.
+	if len(region.GetPeers()) != s.rep.GetMaxReplicas() {
+		return nil
+	}
+
+	op := s.transferPeer(cluster, region, oldPeer)
+	if op == nil {
+		// We can't transfer peer from this store now, so we add it to the cache
+		// and skip it for a while.
+		s.cache.set(oldPeer.GetStoreId())
+	}
+	return op
+}
+
+func (s *balanceRegionScheduler) transferPeer(cluster *clusterInfo, region *regionInfo, oldPeer *metapb.Peer) Operator {
+	// scoreGuard guarantees that the distinct score will not decrease.
+	//stores := cluster.getRegionStores(region)
+	source := cluster.getStore(oldPeer.GetStoreId())
+	//scoreGuard := newDistinctScoreFilter(s.rep, stores, source)
+
+	checker := newReplicaChecker(s.opt, cluster)
+	//newPeer, _ := checker.selectBestPeer(region, scoreGuard)
+	newPeer, _ := checker.selectBestPeer(region)
+	if newPeer == nil {
+		return nil
+	}
+
+	target := cluster.getStore(newPeer.GetStoreId())
+	if !shouldBalance(source, target, s.GetResourceKind()) {
+		return nil
+	}
+	s.limit = adjustBalanceLimit(cluster, s.GetResourceKind())
+
+	return newTransferPeer(region, oldPeer, newPeer)
 }
 
 // shouldBalance returns true if we should balance the source and target store.

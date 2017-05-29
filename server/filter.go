@@ -61,6 +61,37 @@ func (f *excludedFilter) FilterTarget(store *storeInfo) bool {
 	return ok
 }
 
+// distinctScoreFilter ensures that distinct score will not decrease.
+type distinctScoreFilter struct {
+	rep       *Replication
+	stores    []*storeInfo
+	safeScore float64
+}
+
+func newDistinctScoreFilter(rep *Replication, stores []*storeInfo, source *storeInfo) *distinctScoreFilter {
+	newStores := make([]*storeInfo, 0, len(stores)-1)
+	for _, s := range stores {
+		if s.GetId() == source.GetId() {
+			continue
+		}
+		newStores = append(newStores, s)
+	}
+
+	return &distinctScoreFilter{
+		rep:       rep,
+		stores:    newStores,
+		safeScore: rep.GetDistinctScore(newStores, source),
+	}
+}
+
+func (f *distinctScoreFilter) FilterSource(store *storeInfo) bool {
+	return false
+}
+
+func (f *distinctScoreFilter) FilterTarget(store *storeInfo) bool {
+	return f.rep.GetDistinctScore(f.stores, store) < f.safeScore
+}
+
 // type blockFilter struct{}
 
 // func newBlockFilter() *blockFilter {

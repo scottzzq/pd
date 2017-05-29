@@ -62,3 +62,23 @@ func scheduleTransferLeader(cluster *clusterInfo, s Selector, filters ...Filter)
 
 	return region, region.GetStorePeer(target.GetId())
 }
+
+// scheduleRemovePeer schedules a region to remove the peer.
+func scheduleRemovePeer(cluster *clusterInfo, s Selector, filters ...Filter) (*regionInfo, *metapb.Peer) {
+	stores := cluster.getStores()
+
+	source := s.SelectSource(stores, filters...)
+	if source == nil {
+		return nil, nil
+	}
+
+	region := cluster.randFollowerRegion(source.GetId())
+	if region == nil {
+		region = cluster.randLeaderRegion(source.GetId())
+	}
+	if region == nil {
+		return nil, nil
+	}
+
+	return region, region.GetStorePeer(source.GetId())
+}
